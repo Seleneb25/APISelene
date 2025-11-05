@@ -1,0 +1,12 @@
+RewriteEngine On
+RewriteBase /rest-api-selene/
+<Files .htaccess>
+    Order allow,deny
+    Deny from all
+</Files>
+# Redirigir todo lo que empiece con "api/" al archivo api/api.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ api/api.php [QSA,L]
+
+
