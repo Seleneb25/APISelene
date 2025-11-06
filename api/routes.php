@@ -1,8 +1,9 @@
 <?php
-// api/routes.php
+// api/routes.php (MODIFICADO)
 
 // TODOS los archivos están dentro de api/
 require_once __DIR__ . '/controllers/UsuariosController.php';
+require_once __DIR__ . '/controllers/AuthController.php'; // NUEVO
 require_once __DIR__ . '/config/logger.php';
 require_once __DIR__ . '/controllers/StatsController.php';
 
@@ -12,6 +13,7 @@ $uri = trim($uri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
 $controller = new UsuariosController();
+$authController = new AuthController(); // NUEVO
 
 // Mapear alias: aceptar tanto /usuarios como /alumnos
 $aliases = [
@@ -23,6 +25,24 @@ $resource = $aliases[$uri] ?? $uri;
 Logger::info("Request: $method /$uri -> resolved to resource '$resource'");
 
 switch (true) {
+    // ==================== RUTAS PÚBLICAS (SIN AUTENTICACIÓN) ====================
+    case $resource === 'auth/login' && $method === 'POST':
+        $authController->login();
+        break;
+        
+    case $resource === 'auth/logout' && $method === 'POST':
+        $authController->logout();
+        break;
+        
+    case $resource === 'auth/check' && $method === 'GET':
+        $authController->checkAuth();
+        break;
+
+    // ==================== RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) ====================
+    case $resource === 'auth/profile' && $method === 'GET':
+        $authController->getProfile();
+        break;
+
     case $resource === 'usuarios' && $method === 'GET':
         $controller->getAll();
         break;
@@ -65,3 +85,4 @@ switch (true) {
         echo json_encode(["error" => "Ruta no encontrada", "ruta" => $uri]);
         break;
 }
+?>
