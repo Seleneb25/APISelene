@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APISelene - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <!-- Header -->
+    <header class="glass-card p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-white">🚀 APISelene Dashboard</h1>
+                <p id="userInfo" class="text-white/80">Cargando información...</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span id="userRole" class="px-3 py-1 rounded-full text-white text-sm font-semibold bg-white/20"></span>
+                <button onclick="logout()" class="bg-red-500/20 text-red-300 px-4 py-2 rounded-lg hover:bg-red-500/30 transition">
+                    🚪 Cerrar Sesión
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Panel de Control Principal -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            
+            <!-- Sección: Información del Sistema -->
+            <div class="glass-card p-6 text-white">
+                <h2 class="text-xl font-bold mb-4">📊 Información del Sistema</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between">
+                        <span>Usuario:</span>
+                        <span id="currentUsername" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Rol:</span>
+                        <span id="currentRole" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Estado:</span>
+                        <span id="connectionStatus" class="text-green-300">Conectado</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección: Acciones Rápidas -->
+            <div class="glass-card p-6 text-white">
+                <h2 class="text-xl font-bold mb-4">⚡ Acciones Rápidas</h2>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="getAlumnos()" class="btn-primary text-white py-2 px-4 rounded-lg font-semibold">
+                        👥 Ver Alumnos
+                    </button>
+                    <button onclick="getStats()" class="btn-success text-white py-2 px-4 rounded-lg font-semibold">
+                        📈 Estadísticas
+                    </button>
+                    <button id="btnCreateAlumno" onclick="showCreateForm()" class="btn-warning text-gray-800 py-2 px-4 rounded-lg font-semibold hidden">
+                        ➕ Crear Alumno
+                    </button>
+                    <button onclick="clearOutput()" class="bg-white/20 text-white py-2 px-4 rounded-lg font-semibold hover:bg-white/30">
+                        🧹 Limpiar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección: Gestión de Alumnos (Solo Admin) -->
+        <div id="adminSection" class="glass-card p-6 text-white mb-6 hidden">
+            <h2 class="text-xl font-bold mb-4">👨‍🎓 Gestión de Alumnos (Admin)</h2>
+            
+            <!-- Formulario Crear Alumno -->
+            <div id="createForm" class="mb-6 p-4 bg-white/10 rounded-lg hidden">
+                <h3 class="font-semibold mb-3">➕ Crear Nuevo Alumno</h3>
+                <form onsubmit="event.preventDefault(); createAlumno();" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input id="alumnoNombre" type="text" placeholder="Nombre" class="p-2 rounded bg-white/20 border border-white/30 text-white placeholder-white/60" required>
+                    <input id="alumnoEdad" type="number" placeholder="Edad" class="p-2 rounded bg-white/20 border border-white/30 text-white placeholder-white/60" required>
+                    <input id="alumnoCorreo" type="email" placeholder="Correo" class="p-2 rounded bg-white/20 border border-white/30 text-white placeholder-white/60">
+                    <div class="md:col-span-3 flex gap-2">
+                        <button type="submit" class="btn-success text-white py-2 px-4 rounded font-semibold">
+                            Crear Alumno
+                        </button>
+                        <button type="button" onclick="hideCreateForm()" class="bg-white/20 text-white py-2 px-4 rounded font-semibold">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+                <p id="createError" class="text-red-300 text-sm mt-2 hidden"></p>
+            </div>
+
+            <!-- Lista de Alumnos -->
+            <div>
+                <h3 class="font-semibold mb-3">📋 Lista de Alumnos</h3>
+                <div id="alumnosList" class="bg-white/10 rounded-lg p-4">
+                    <p class="text-white/60">Haz click en "Ver Alumnos" para cargar la lista</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección: Consola de Salida -->
+        <div class="glass-card p-6 text-white">
+            <h2 class="text-xl font-bold mb-4">📋 Consola de Salida</h2>
+            <pre id="output" class="bg-black/20 p-4 rounded text-sm h-48 overflow-auto font-mono text-white/90">Esperando solicitudes...</pre>
+        </div>
+
+        <!-- Mensajes del Sistema -->
+        <div id="message" class="mt-4 p-3 rounded-lg hidden"></div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        // Verificar autenticación al cargar
+        document.addEventListener('DOMContentLoaded', async function() {
+            await checkAuthentication();
+            
+            // Verificar cada 30 segundos si sigue autenticado
+            setInterval(checkAuthentication, 30000);
+        });
+
+        // Verificar autenticación
+        async function checkAuthentication() {
+            try {
+                const response = await fetch('/APISelene/api/auth/check');
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    currentUser = data.user;
+                    updateUIForUser(data.user);
+                } else {
+                    // Redirigir al login si no está autenticado
+                    window.location.href = 'login.html';
+                }
+            } catch (error) {
+                showMessage('❌ Error de conexión: ' + error.message, 'error');
+                // En caso de error, asumimos que no está autenticado
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Actualizar UI según el rol del usuario
+        function updateUIForUser(user) {
+            document.getElementById('userInfo').textContent = `Bienvenido, ${user.username}`;
+            document.getElementById('currentUsername').textContent = user.username;
+            document.getElementById('currentRole').textContent = user.rol;
+            document.getElementById('userRole').textContent = user.rol === 'admin' ? '👑 Administrador' : '👤 Usuario';
+            
+            // Mostrar/ocultar secciones según el rol
+            if (user.rol === 'admin') {
+                document.getElementById('adminSection').classList.remove('hidden');
+                document.getElementById('btnCreateAlumno').classList.remove('hidden');
+            } else {
+                document.getElementById('adminSection').classList.add('hidden');
+                document.getElementById('btnCreateAlumno').classList.add('hidden');
+            }
+        }
+
+        // ==================== FUNCIONES DE ALUMNOS ====================
+
+        // Obtener lista de alumnos
+        async function getAlumnos() {
+            try {
+                const response = await fetch('/APISelene/api/usuarios');
+                const data = await response.json();
+                
+                outputToConsole('GET /api/usuarios:', data);
+                
+                if (Array.isArray(data)) {
+                    displayAlumnosList(data);
+                } else {
+                    document.getElementById('alumnosList').innerHTML = '<p class="text-red-300">Error al cargar alumnos</p>';
+                }
+            } catch (error) {
+                outputToConsole('ERROR:', error.message);
+                showMessage('❌ Error al obtener alumnos: ' + error.message, 'error');
+            }
+        }
+
+        // Mostrar lista de alumnos en la UI
+        function displayAlumnosList(alumnos) {
+            const container = document.getElementById('alumnosList');
+            
+            if (alumnos.length === 0) {
+                container.innerHTML = '<p class="text-white/60">No hay alumnos registrados</p>';
+                return;
+            }
+
+            let html = '<div class="space-y-2">';
+            alumnos.forEach(alumno => {
+                html += `
+                    <div class="flex justify-between items-center p-3 bg-white/5 rounded">
+                        <div>
+                            <span class="font-semibold">${alumno.nombre || 'Sin nombre'}</span>
+                            <span class="text-white/60 ml-2">Edad: ${alumno.edad || 'N/A'}</span>
+                            <span class="text-white/60 ml-2">Rol: ${alumno.rol || 'N/A'}</span>
+                        </div>
+                        ${currentUser.rol === 'admin' ? `
+                        <div class="flex gap-2">
+                            <button onclick="deleteAlumno(${alumno.id})" class="bg-red-500/20 text-red-300 px-2 py-1 rounded text-sm hover:bg-red-500/30">
+                                🗑️ Eliminar
+                            </button>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+
+        // Crear nuevo alumno (solo admin)
+        async function createAlumno() {
+            const nombre = document.getElementById('alumnoNombre').value;
+            const edad = document.getElementById('alumnoEdad').value;
+            const correo = document.getElementById('alumnoCorreo').value;
+
+            try {
+                const response = await fetch('/APISelene/api/usuarios', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        nombre, 
+                        edad: parseInt(edad),
+                        correo,
+                        rol: 'Alumno'
+                    })
+                });
+                
+                const data = await response.json();
+                outputToConsole('POST /api/usuarios:', data);
+                
+                if (response.ok) {
+                    showMessage('✅ Alumno creado exitosamente', 'success');
+                    hideCreateForm();
+                    getAlumnos(); // Recargar lista
+                } else {
+                    showMessage('❌ Error al crear alumno: ' + (data.error || 'Error desconocido'), 'error');
+                }
+            } catch (error) {
+                outputToConsole('ERROR:', error.message);
+                showMessage('❌ Error al crear alumno: ' + error.message, 'error');
+            }
+        }
+
+        // Eliminar alumno (solo admin)
+        async function deleteAlumno(id) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este alumno?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/APISelene/api/usuarios', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ id })
+                });
+                
+                const data = await response.json();
+                outputToConsole('DELETE /api/usuarios:', data);
+                
+                if (response.ok) {
+                    showMessage('✅ Alumno eliminado exitosamente', 'success');
+                    getAlumnos(); // Recargar lista
+                } else {
+                    showMessage('❌ Error al eliminar alumno: ' + (data.error || 'Error desconocido'), 'error');
+                }
+            } catch (error) {
+                outputToConsole('ERROR:', error.message);
+                showMessage('❌ Error al eliminar alumno: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== FUNCIONES UTILITARIAS ====================
+
+        // Obtener estadísticas
+        async function getStats() {
+            try {
+                const response = await fetch('/APISelene/api/stats');
+                const data = await response.json();
+                outputToConsole('GET /api/stats:', data);
+            } catch (error) {
+                outputToConsole('ERROR:', error.message);
+            }
+        }
+
+        // Cerrar sesión
+        async function logout() {
+            try {
+                await fetch('/APISelene/api/auth/logout', { method: 'POST' });
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+                window.location.href = 'login.html';
+            } catch (error) {
+                // Si hay error, igual redirigir al login
+                localStorage.removeItem('user');
+                localStorage.removeItem('token');
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Mostrar/ocultar formulario de creación
+        function showCreateForm() {
+            document.getElementById('createForm').classList.remove('hidden');
+        }
+
+        function hideCreateForm() {
+            document.getElementById('createForm').classList.add('hidden');
+            document.getElementById('createError').classList.add('hidden');
+        }
+
+        // Output a la consola
+        function outputToConsole(title, data) {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.textContent += `\n[${timestamp}] ${title}\n${JSON.stringify(data, null, 2)}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Limpiar consola
+        function clearOutput() {
+            document.getElementById('output').textContent = 'Consola limpiada...\n';
+        }
+
+        // Mostrar mensajes
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = text;
+            messageDiv.className = 'mt-4 p-3 rounded-lg text-center font-semibold ';
+            
+            if (type === 'success') {
+                messageDiv.classList.add('bg-green-500/20', 'text-green-300', 'border', 'border-green-500/30');
+            } else {
+                messageDiv.classList.add('bg-red-500/20', 'text-red-300', 'border', 'border-red-500/30');
+            }
+            
+            messageDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                messageDiv.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
