@@ -1,11 +1,13 @@
 <?php
-// api/routes.php (MODIFICADO)
+// api/routes.php (CON MIDDLEWARE)
 
 // TODOS los archivos están dentro de api/
 require_once __DIR__ . '/controllers/UsuariosController.php';
-require_once __DIR__ . '/controllers/AuthController.php'; // NUEVO
+require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/config/logger.php';
 require_once __DIR__ . '/controllers/StatsController.php';
+require_once __DIR__ . '/middleware/AuthMiddleware.php'; // NUEVO
+require_once __DIR__ . '/middleware/RoleMiddleware.php'; // NUEVO
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = preg_replace('#^.*/api/#', '', $uri);
@@ -13,7 +15,7 @@ $uri = trim($uri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
 $controller = new UsuariosController();
-$authController = new AuthController(); // NUEVO
+$authController = new AuthController();
 
 // Mapear alias: aceptar tanto /usuarios como /alumnos
 $aliases = [
@@ -40,22 +42,38 @@ switch (true) {
 
     // ==================== RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) ====================
     case $resource === 'auth/profile' && $method === 'GET':
+        AuthMiddleware::handle(); // Verificar autenticación
         $authController->getProfile();
         break;
 
     case $resource === 'usuarios' && $method === 'GET':
+        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver
         $controller->getAll();
         break;
 
     case $resource === 'stats' && $method === 'GET':
+        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver stats
         StatsController::handler();
         break;
 
+    // ==================== RUTAS SOLO ADMIN ====================
     case $resource === 'usuarios' && $method === 'POST':
+        RoleMiddleware::handleAdmin(); // Solo admin puede crear
         $controller->create();
         break;
 
+    case $resource === 'usuarios' && $method === 'PATCH':
+        RoleMiddleware::handleAdmin(); // Solo admin puede actualizar
+        $controller->update();
+        break;
+
+    case $resource === 'usuarios' && $method === 'DELETE':
+        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar
+        $controller->delete();
+        break;
+
     case $resource === 'logevent' && $method === 'POST':
+        AuthMiddleware::handle(); // Cualquier usuario autenticado puede log events
         $input = json_decode(file_get_contents('php://input'), true);
         $nombre = isset($input['nombre']) ? trim($input['nombre']) : '';
         if ($nombre === '' || !preg_match('/^[\p{L}\s]+$/u', $nombre)) {
@@ -70,14 +88,6 @@ switch (true) {
             }
             echo json_encode(["success" => true]);
         }
-        break;
-
-    case $resource === 'usuarios' && $method === 'PATCH':
-        $controller->update();
-        break;
-
-    case $resource === 'usuarios' && $method === 'DELETE':
-        $controller->delete();
         break;
 
     default:
