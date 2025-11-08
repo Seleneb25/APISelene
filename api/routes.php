@@ -1,25 +1,26 @@
 <?php
-// api/routes.php (CON MIDDLEWARE)
+// api/routes.php (ACTUALIZADO PARA ALUMNOS)
 
 // TODOS los archivos están dentro de api/
-require_once __DIR__ . '/controllers/UsuariosController.php';
+require_once __DIR__ . '/controllers/AlumnosController.php'; // CAMBIADO: UsuariosController → AlumnosController
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/config/logger.php';
 require_once __DIR__ . '/controllers/StatsController.php';
-require_once __DIR__ . '/middleware/AuthMiddleware.php'; // NUEVO
-require_once __DIR__ . '/middleware/RoleMiddleware.php'; // NUEVO
+require_once __DIR__ . '/middleware/AuthMiddleware.php';
+require_once __DIR__ . '/middleware/RoleMiddleware.php';
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = preg_replace('#^.*/api/#', '', $uri);
 $uri = trim($uri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
-$controller = new UsuariosController();
+$alumnosController = new AlumnosController(); // CAMBIADO: Nuevo controller
 $authController = new AuthController();
 
-// Mapear alias: aceptar tanto /usuarios como /alumnos
+// Mapear alias: aceptar tanto /alumnos como /usuarios para compatibilidad
 $aliases = [
-    'alumnos' => 'usuarios'
+    'usuarios' => 'alumnos', // CAMBIADO: Invertido para priorizar alumnos
+    'alumnos' => 'alumnos'
 ];
 
 $resource = $aliases[$uri] ?? $uri;
@@ -42,38 +43,54 @@ switch (true) {
 
     // ==================== RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) ====================
     case $resource === 'auth/profile' && $method === 'GET':
-        AuthMiddleware::handle(); // Verificar autenticación
+        AuthMiddleware::handle();
         $authController->getProfile();
         break;
 
-    case $resource === 'usuarios' && $method === 'GET':
-        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver
-        $controller->getAll();
+    case $resource === 'alumnos' && $method === 'GET':
+        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver alumnos
+        $alumnosController->getAll();
         break;
 
     case $resource === 'stats' && $method === 'GET':
-        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver stats
+        AuthMiddleware::handle();
         StatsController::handler();
         break;
 
     // ==================== RUTAS SOLO ADMIN ====================
-    case $resource === 'usuarios' && $method === 'POST':
-        RoleMiddleware::handleAdmin(); // Solo admin puede crear
-        $controller->create();
+    case $resource === 'alumnos' && $method === 'POST':
+        RoleMiddleware::handleAdmin(); // Solo admin puede crear alumnos
+        $alumnosController->create();
         break;
 
-    case $resource === 'usuarios' && $method === 'PATCH':
-        RoleMiddleware::handleAdmin(); // Solo admin puede actualizar
-        $controller->update();
+    case $resource === 'alumnos' && $method === 'PATCH':
+        RoleMiddleware::handleAdmin(); // Solo admin puede actualizar alumnos
+        $alumnosController->update();
         break;
 
-    case $resource === 'usuarios' && $method === 'DELETE':
-        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar
-        $controller->delete();
+    case $resource === 'alumnos' && $method === 'DELETE':
+        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar alumnos (soft delete)
+        $alumnosController->delete();
+        break;
+
+    // ==================== NUEVAS RUTAS SOFT DELETE ====================
+    case $resource === 'alumnos/deleted' && $method === 'GET':
+        RoleMiddleware::handleAdmin(); // Solo admin puede ver eliminados
+        $alumnosController->getDeleted();
+        break;
+
+    case $resource === 'alumnos/restore' && $method === 'POST':
+        RoleMiddleware::handleAdmin(); // Solo admin puede restaurar
+        $alumnosController->restore();
+        break;
+
+    case $resource === 'alumnos/force-delete' && $method === 'DELETE':
+        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar permanentemente
+        $alumnosController->forceDelete();
         break;
 
     case $resource === 'logevent' && $method === 'POST':
-        AuthMiddleware::handle(); // Cualquier usuario autenticado puede log events
+        AuthMiddleware::handle();
         $input = json_decode(file_get_contents('php://input'), true);
         $nombre = isset($input['nombre']) ? trim($input['nombre']) : '';
         if ($nombre === '' || !preg_match('/^[\p{L}\s]+$/u', $nombre)) {
