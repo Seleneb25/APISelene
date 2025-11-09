@@ -87,12 +87,6 @@
             </div>
         </div>
 
-        <!-- Enlace al Dashboard (temporal) -->
-        <div class="mt-4 text-center">
-            <a href="dashboard.html" class="text-white/60 hover:text-white text-sm">
-                Ir al Dashboard →
-            </a>
-        </div>
     </div>
 
     <script>
@@ -110,7 +104,7 @@
             submitBtn.disabled = true;
             
             try {
-                const response = await fetch('/APISelene/api/auth/login', {
+                const response = await fetch('api/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
