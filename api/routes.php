@@ -56,7 +56,7 @@ switch (true) {
         AuthMiddleware::handle();
         StatsController::handler();
         break;
-
+//  ESTE ARCHIVO YA LIMITA OPERACIONES SOLO A ADMIN
     // ==================== RUTAS SOLO ADMIN ====================
     case $resource === 'alumnos' && $method === 'POST':
         RoleMiddleware::handleAdmin(); // Solo admin puede crear alumnos
