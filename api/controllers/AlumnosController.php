@@ -9,7 +9,7 @@ class AlumnosController {
     public function __construct() {
         $this->model = new Alumnos();
     }
-
+//  ESTE ARCHIVO YA TIENE TRY-CATCH IMPLEMENTADO 
     public function getAll() {
         try {
             Logger::info('GET /alumnos');
