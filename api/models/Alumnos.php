@@ -39,6 +39,8 @@ class Alumnos {
     /**
      * Crear nuevo alumno
      */
+
+    // ESTE ARCHIVO YA TIENE TRY-CATCH IMPLEMENTADO
     public function create($data) {
         try {
             $nombre = isset($data['nombre']) ? $data['nombre'] : null;
