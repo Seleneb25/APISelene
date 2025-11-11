@@ -19,7 +19,7 @@ class RoleMiddleware {
             ]);
             return false;
         }
-        
+        //  ESTE ARCHIVO YA DEVUELVE 403 FORBIDDEN
         // Verificar rol
         if ($user['rol'] !== $requiredRole) {
             http_response_code(403);
