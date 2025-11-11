@@ -106,6 +106,7 @@ class Logger {
     /**
      * Escribir en el log con formato mejorado
      */
+    //  ESTE ARCHIVO YA MONITOREA PETICIONES AUTOMÁTICAMENTE
     private static function write($level, $message, $context = []) {
         self::ensureInit();
         
