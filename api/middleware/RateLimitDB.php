@@ -104,4 +104,4 @@ class RateLimitDB {
         $stmt->execute([$cutoff]);
     }
 }
-?>
+?>  
