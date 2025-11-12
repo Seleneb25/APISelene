@@ -1,25 +1,25 @@
-<?php
 // api/routes.php (ACTUALIZADO PARA ALUMNOS)
 
 // TODOS los archivos están dentro de api/
-require_once __DIR__ . '/controllers/AlumnosController.php'; // CAMBIADO: UsuariosController → AlumnosController
+require_once __DIR__ . '/controllers/AlumnosController.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/config/logger.php';
 require_once __DIR__ . '/controllers/StatsController.php';
 require_once __DIR__ . '/middleware/AuthMiddleware.php';
 require_once __DIR__ . '/middleware/RoleMiddleware.php';
+require_once __DIR__ . '/middleware/LoginAttemptMiddleware.php'; // NUEVO: Para rate limiting
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = preg_replace('#^.*/api/#', '', $uri);
 $uri = trim($uri, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
-$alumnosController = new AlumnosController(); // CAMBIADO: Nuevo controller
+$alumnosController = new AlumnosController();
 $authController = new AuthController();
 
 // Mapear alias: aceptar tanto /alumnos como /usuarios para compatibilidad
 $aliases = [
-    'usuarios' => 'alumnos', // CAMBIADO: Invertido para priorizar alumnos
+    'usuarios' => 'alumnos',
     'alumnos' => 'alumnos'
 ];
 
@@ -41,6 +41,12 @@ switch (true) {
         $authController->checkAuth();
         break;
 
+    // NUEVA RUTA: Consultar tiempo de bloqueo
+    case $resource === 'auth/blocked-time' && $method === 'GET':
+        $blockedInfo = LoginAttemptMiddleware::getBlockedTime();
+        echo json_encode($blockedInfo);
+        break;
+
     // ==================== RUTAS PROTEGIDAS (REQUIEREN AUTENTICACIÓN) ====================
     case $resource === 'auth/profile' && $method === 'GET':
         AuthMiddleware::handle();
@@ -48,7 +54,7 @@ switch (true) {
         break;
 
     case $resource === 'alumnos' && $method === 'GET':
-        AuthMiddleware::handle(); // Cualquier usuario autenticado puede ver alumnos
+        AuthMiddleware::handle();
         $alumnosController->getAll();
         break;
 
@@ -56,36 +62,36 @@ switch (true) {
         AuthMiddleware::handle();
         StatsController::handler();
         break;
-//  ESTE ARCHIVO YA LIMITA OPERACIONES SOLO A ADMIN
+
     // ==================== RUTAS SOLO ADMIN ====================
     case $resource === 'alumnos' && $method === 'POST':
-        RoleMiddleware::handleAdmin(); // Solo admin puede crear alumnos
+        RoleMiddleware::handleAdmin();
         $alumnosController->create();
         break;
 
     case $resource === 'alumnos' && $method === 'PATCH':
-        RoleMiddleware::handleAdmin(); // Solo admin puede actualizar alumnos
+        RoleMiddleware::handleAdmin();
         $alumnosController->update();
         break;
 
     case $resource === 'alumnos' && $method === 'DELETE':
-        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar alumnos (soft delete)
+        RoleMiddleware::handleAdmin();
         $alumnosController->delete();
         break;
 
     // ==================== NUEVAS RUTAS SOFT DELETE ====================
     case $resource === 'alumnos/deleted' && $method === 'GET':
-        RoleMiddleware::handleAdmin(); // Solo admin puede ver eliminados
+        RoleMiddleware::handleAdmin();
         $alumnosController->getDeleted();
         break;
 
     case $resource === 'alumnos/restore' && $method === 'POST':
-        RoleMiddleware::handleAdmin(); // Solo admin puede restaurar
+        RoleMiddleware::handleAdmin();
         $alumnosController->restore();
         break;
 
     case $resource === 'alumnos/force-delete' && $method === 'DELETE':
-        RoleMiddleware::handleAdmin(); // Solo admin puede eliminar permanentemente
+        RoleMiddleware::handleAdmin();
         $alumnosController->forceDelete();
         break;
 
@@ -112,4 +118,3 @@ switch (true) {
         echo json_encode(["error" => "Ruta no encontrada", "ruta" => $uri]);
         break;
 }
-?>
