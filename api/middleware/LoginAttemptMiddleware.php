@@ -31,5 +31,22 @@ class LoginAttemptMiddleware {
             ]);
         }
     }
+    
+    // NUEVO MÉTODO: Obtener información de bloqueo
+    public static function getBlockedTime() {
+        if (!self::$rateLimit) {
+            self::$rateLimit = new RateLimitDB();
+        }
+        
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $secondsLeft = self::$rateLimit->getBlockedTime($ip);
+        
+        return [
+            'blocked' => $secondsLeft > 0,
+            'seconds_left' => $secondsLeft,
+            'minutes_left' => ceil($secondsLeft / 60),
+            'ip' => $ip
+        ];
+    }
 }
 ?>
