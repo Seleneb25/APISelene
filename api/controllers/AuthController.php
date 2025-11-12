@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../models/User.php';
+require_once __DIR__ . '/../middleware/LoginAttemptMiddleware.php'; // NUEVO: Rate limiting
 
 class AuthController {
     private $userModel;
@@ -43,11 +44,18 @@ class AuthController {
             return;
         }
 
+        // NUEVO: Verificar rate limiting antes del login
+        if (!LoginAttemptMiddleware::checkLoginAttempts()) {
+            return; // Ya se envió respuesta 429
+        }
+
         try {
             // Buscar usuario en la base de datos
             $user = $this->userModel->findByUsername($username);
             
             if (!$user) {
+                // NUEVO: Registrar intento fallido
+                LoginAttemptMiddleware::recordLoginAttempt($username, false);
                 Logger::warn("Intento de login fallido - Usuario no encontrado: $username");
                 http_response_code(401);
                 echo json_encode(["error" => "Credenciales inválidas"]);
@@ -56,6 +64,8 @@ class AuthController {
 
             // Verificar contraseña
             if (!password_verify($password, $user['password_hash'])) {
+                // NUEVO: Registrar intento fallido
+                LoginAttemptMiddleware::recordLoginAttempt($username, false);
                 Logger::warn("Intento de login fallido - Password incorrecto para: $username");
                 http_response_code(401);
                 echo json_encode(["error" => "Credenciales inválidas"]);
@@ -64,11 +74,16 @@ class AuthController {
 
             // Verificar si el usuario está activo
             if (!$user['activo']) {
+                // NUEVO: Registrar intento fallido
+                LoginAttemptMiddleware::recordLoginAttempt($username, false);
                 Logger::warn("Intento de login - Usuario inactivo: $username");
                 http_response_code(403);
                 echo json_encode(["error" => "Usuario desactivado"]);
                 return;
             }
+
+            // NUEVO: Registrar login exitoso (limpia intentos)
+            LoginAttemptMiddleware::recordLoginAttempt($username, true);
 
             // Iniciar sesión
             session_start();

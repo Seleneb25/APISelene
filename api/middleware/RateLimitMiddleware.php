@@ -31,12 +31,12 @@ class RateLimitMiddleware {
             });
         
         if (count($recentAttempts) >= $maxAttempts) {
-            // Bloquear por 30 minutos
-            self::$blockedIPs[$ip] = time() + (30 * 60);
+           // Bloquear por 5 minutos
+             self::$blockedIPs[$ip] = time() + (5 * 60);
             http_response_code(429);
             echo json_encode([
                 "error" => "Demasiados intentos",
-                "message" => "Demasiados intentos fallidos. IP bloqueada por 30 minutos."
+                "message" => "Demasiados intentos fallidos. IP bloqueada por 5 minutos."
             ]);
             return false;
         }

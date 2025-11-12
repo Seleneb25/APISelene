@@ -8,7 +8,7 @@ class LoginAttemptMiddleware {
      * Verificar intentos de login antes de permitir acceso
      */
     public static function checkLoginAttempts() {
-        return RateLimitMiddleware::checkRateLimit(3, 15); // 3 intentos en 15 min
+        return RateLimitMiddleware::checkRateLimit(3, 1);  // 3 intentos en 1 min
     }
     
     /**
