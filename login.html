@@ -23,6 +23,16 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
+
+        .countdown-animation {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
     </style>
 </head>
 <body class="gradient-bg min-h-screen flex items-center justify-center p-4">
@@ -160,6 +170,104 @@
                 messageDiv.classList.add('hidden');
             }, 5000);
         }
+
+        // Contador para bloqueo por intentos
+let countdownTimer = null;
+
+function showBlockedMessage(minutes) {
+    const messageDiv = document.getElementById('message');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    // Deshabilitar formulario
+    submitBtn.disabled = true;
+    document.getElementById('username').disabled = true;
+    document.getElementById('password').disabled = true;
+    
+    let seconds = minutes * 60;
+    
+    function updateCountdown() {
+        const minutesLeft = Math.floor(seconds / 60);
+        const secondsLeft = seconds % 60;
+        
+        messageDiv.innerHTML = `⏰ Demasiados intentos. Tiempo restante: ${minutesLeft}:${secondsLeft < 10 ? '0' : ''}${secondsLeft}`;
+        messageDiv.className = 'mt-4 p-3 rounded-lg text-center font-semibold bg-orange-500/20 text-orange-300 border border-orange-500/30';
+        messageDiv.classList.remove('hidden');
+        
+        if (seconds <= 0) {
+            clearInterval(countdownTimer);
+            messageDiv.classList.add('hidden');
+            submitBtn.disabled = false;
+            document.getElementById('username').disabled = false;
+            document.getElementById('password').disabled = false;
+            submitBtn.innerHTML = '🚀 Iniciar Sesión';
+        } else {
+            seconds--;
+        }
+    }
+    
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
+}
+
+// Modificar la parte del fetch en el event listener del formulario:
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const messageDiv = document.getElementById('message');
+    
+    // Mostrar loading
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '⏳ Iniciando sesión...';
+    submitBtn.disabled = true;
+    
+    try {
+        const response = await fetch('api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.status === 429) {
+            // Bloqueado por rate limiting
+            showBlockedMessage(5); // 5 minutos de bloqueo
+            return;
+        }
+        
+        if (response.ok && data.success) {
+            // Login exitoso
+            showMessage('✅ ' + data.message, 'success');
+            
+            // Guardar datos de usuario en localStorage
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', 'logged-in');
+            
+            // Redirigir al dashboard después de 1 segundo
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 1000);
+            
+        } else {
+            // Error en login
+            showMessage('❌ ' + (data.error || 'Error en el login'), 'error');
+        }
+        
+    } catch (error) {
+        showMessage('❌ Error de conexión: ' + error.message, 'error');
+    } finally {
+        // Solo restaurar botón si no está bloqueado
+        if (response?.status !== 429) {
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        }
+    }
+});
         
         // Verificar si ya está logueado
         document.addEventListener('DOMContentLoaded', function() {
