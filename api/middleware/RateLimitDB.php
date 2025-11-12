@@ -103,5 +103,29 @@ class RateLimitDB {
         $stmt = $this->db->prepare("DELETE FROM {$this->table} WHERE last_attempt < ? AND blocked_until IS NULL");
         $stmt->execute([$cutoff]);
     }
+    
+    // NUEVO MÉTODO: Obtener tiempo restante de bloqueo
+    public function getBlockedTime($ip) {
+        $stmt = $this->db->prepare("SELECT blocked_until FROM {$this->table} WHERE ip = ? AND blocked_until > NOW()");
+        $stmt->execute([$ip]);
+        $blocked = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($blocked && $blocked['blocked_until']) {
+            $blockedUntil = strtotime($blocked['blocked_until']);
+            $currentTime = time();
+            $secondsLeft = $blockedUntil - $currentTime;
+            
+            return max(0, $secondsLeft); // Devuelve segundos restantes
+        }
+        
+        return 0; // No está bloqueado
+    }
+    
+    // NUEVO MÉTODO: Obtener estadísticas (opcional)
+    public function getStats() {
+        $stmt = $this->db->prepare("SELECT COUNT(*) as total, SUM(CASE WHEN blocked_until > NOW() THEN 1 ELSE 0 END) as blocked FROM {$this->table}");
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 }
-?>  
+?>
