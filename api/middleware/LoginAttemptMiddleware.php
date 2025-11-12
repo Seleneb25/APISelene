@@ -1,43 +1,35 @@
 <?php
 // api/middleware/LoginAttemptMiddleware.php
-require_once __DIR__ . '/RateLimitMiddleware.php';
+require_once __DIR__ . '/RateLimitDB.php';
 require_once __DIR__ . '/../config/logger.php';
 
 class LoginAttemptMiddleware {
-    /**
-     * Verificar intentos de login antes de permitir acceso
-     */
+    private static $rateLimit;
+    
     public static function checkLoginAttempts() {
-        return RateLimitMiddleware::checkRateLimit(3, 1);  // 3 intentos en 1 min
+        if (!self::$rateLimit) {
+            self::$rateLimit = new RateLimitDB();
+        }
+        return self::$rateLimit->checkRateLimit(3, 1, 5); // 3 intentos en 1 min, bloqueo 5 min
     }
     
-    /**
-     * Registrar intento de login (éxito o fallo)
-     */
     public static function recordLoginAttempt($username, $success) {
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        RateLimitMiddleware::recordAttempt($ip, $success);
         
-        // Log del intento
-        if (!$success) {
+        if (!self::$rateLimit) {
+            self::$rateLimit = new RateLimitDB();
+        }
+        
+        if ($success) {
+            self::$rateLimit->recordSuccess($ip);
+            Logger::info("Login exitoso", ["ip" => $ip, "username" => $username]);
+        } else {
             Logger::security("Intento de login fallido", [
-                "ip" => $ip,
+                "ip" => $ip, 
                 "username" => $username,
                 "timestamp" => date('Y-m-d H:i:s')
             ]);
-        } else {
-            Logger::info("Login exitoso", [
-                "ip" => $ip,
-                "username" => $username
-            ]);
         }
-    }
-    
-    /**
-     * Obtener estadísticas de intentos de login
-     */
-    public static function getLoginStats() {
-        return RateLimitMiddleware::getStats();
     }
 }
 ?>
