@@ -808,18 +808,14 @@ Respuesta:
 
 ### Demostración Completa de la API
 
-![Video README](./VideoReadme.mp4)
-
-
 https://github.com/user-attachments/assets/1d226c8c-1bd7-4c19-ad65-6a50740e90e2
-
 
 El video demuestra:
 - Autenticación exitosa
-- Control de roles funcionando
+- Control de roles de admin y sus permisos
+- Demostracion del usario y su rol en la parte derecha
 - CRUD completo (Create - Read - Update - Delete)
-- Soft delete en acción
-- Logs registrando cada operación
+- En la parte de la ventana se agrego el FavIcons
 
 ---
 
