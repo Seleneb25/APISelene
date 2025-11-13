@@ -1,4 +1,401 @@
-# APISelene - API REST de Gestión Académica
+## Manejo de Excepciones (Try/Catch)
+
+### Implementación en Controladores
+
+Todos los controladores implementan try/catch para capturar y registrar errores:
+
+**AuthController.php:**
+```php
+try {
+    $user = $this->userModel->findByUsername($username);
+    if (!$user) {
+        Logger::warn("Intento de login fallido - Usuario no encontrado: $username");
+        http_response_code(401);
+        echo json_encode(["error" => "Credenciales inválidas"]);
+        return;
+    }
+} catch (Exception $e) {
+    Logger::error("Error en login: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(["error" => "Error interno del servidor"]);
+}
+```
+
+**AlumnosController.php:**
+```php
+try {
+    $res = $this->model->create($input);
+    Logger::info('POST /alumnos result: ' . json_encode($res));
+} catch (PDOException $e) {
+    Logger::error("Error al crear alumno - SQL Error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(["success" => false, "error" => "Error en la base de datos"]);
+}
+```
+
+**StatsController.php:**
+```php
+public static function handler() {
+    try {
+        $uptime = round(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 2);
+        $memory = round(memory_get_usage() / 1024 / 1024, 2);
+        echo json_encode([
+            "uptime_seconds" => $uptime,
+            "memory_MB" => $memory,
+            "fecha" => date("Y-m-d H:i:s")  
+        ]);
+    } catch (Exception $e) {
+        Logger::error("Error en estadísticas: " . $e->getMessage());
+        http_response_code(500);
+    }
+}
+```
+
+**Alumnos.php (Modelo):**
+```php
+try {
+    $stmt = $this->db->query("SELECT id, nombre, edad, correo, rol, created_at 
+                            FROM alumnos 
+                            WHERE activo = 1 
+                            ORDER BY id DESC");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    Logger::error("Error en Alumnos::getAllActive - " . $e->getMessage());
+    return [];
+}
+```
+
+**Ventajas del Try/Catch:**
+- Evita que la aplicación se bloquee
+- Registra errores detallados en logs
+- Proporciona mensajes de error seguros al usuario
+- Facilita debugging
+- Mejora estabilidad del sistema
+
+---
+
+## Monitoreo de Peticiones (server.log)
+
+### Archivo de Logs Estructurado
+
+Cada petición se registra automáticamente con:
+- Timestamp exacto
+- Dirección IP del cliente
+- Método HTTP (GET, POST, PATCH, DELETE)
+- URI de la petición
+- Tipo de operación (AUDIT, SECURITY, DATABASE, API)
+- Contexto JSON con datos relevantes
+
+**Ejemplo de log completo:**
+```
+[2024-01-15 14:32:45] [INFO] [IP:127.0.0.1] [POST /api/auth/login] [AUDIT] Usuario logueado | Context: {"user":"admin","action":"login"}
+[2024-01-15 14:33:12] [INFO] [IP:127.0.0.1] [POST /api/alumnos] Alumno insertado correctamente con ID: 5
+[2024-01-15 14:33:45] [WARN] [IP:127.0.0.1] [DELETE /api/alumnos] [SECURITY] Intento de acceso no autorizado | Context: {"ip":"127.0.0.1"}
+[2024-01-15 14:35:20] [ERROR] [IP:127.0.0.1] [DELETE /api/alumnos] Database error | Context: {"error":"SQLSTATE[23000]","query":"DELETE FROM alumnos WHERE id = 999"}
+```
+
+### Características de Monitoreo
+
+- **Rotación Automática:** Cuando `server.log` alcanza 5000 líneas, se comprime a gzip en `logs/archive/`
+- **Archivo Principal:** `logs/server.log` siempre contiene los eventos recientes
+- **Archivo Archivado:** `logs/archive/server.log.YYYYMMDD_HHMMSS.gz` guarda historial comprimido
+- **Gestión de Almacenamiento:** Evita que los logs ocupen demasiado espacio
+- **Búsqueda de Auditoría:** Es fácil encontrar qué pasó en una fecha/hora específica
+
+### Acceso a Logs
+
+Para ver los logs en tiempo real:
+1. Abre `C:\xampp\htdocs\APISelene\logs\server.log` con un editor de texto
+2. O accede via navegador: `http://localhost/APISelene/logs/server.log` (si no está protegido)
+3. Las líneas más recientes están al final del archivo
+
+---
+
+## Control de Roles y Respuesta 403 Forbidden
+
+### Implementación de RoleMiddleware
+
+El middleware de roles verifica permisos en cada ruta sensible:
+
+```php
+// En routes.php
+case $resource === 'alumnos' && $method === 'POST':
+    RoleMiddleware::handleAdmin(); // Verifica rol admin
+    $alumnosController->create();
+    break;
+
+case $resource === 'alumnos' && $method === 'DELETE':
+    RoleMiddleware::handleAdmin(); // Solo admin puede eliminar
+    $alumnosController->delete();
+    break;
+```
+
+### RoleMiddleware.php
+
+```php
+public static function checkRole($requiredRole) {
+    $user = AuthMiddleware::getUser();
+    
+    if (!$user) {
+        http_response_code(401); // No autenticado
+        echo json_encode(["error" => "No autenticado"]);
+        return false;
+    }
+    
+    if ($user['rol'] !== $requiredRole) {
+        http_response_code(403); // Forbidden - Sin permisos
+        echo json_encode([
+            "error" => "Acceso denegado",
+            "message" => "No tienes permisos para realizar esta acción",
+            "required_role" => $requiredRole,
+            "current_role" => $user['rol']
+        ]);
+        return false;
+    }
+    
+    return true;
+}
+```
+
+### Respuestas Posibles
+
+**Usuario no autenticado intenta POST:**
+```json
+{
+    "error": "No autenticado",
+    "message": "Debes iniciar sesión para acceder a este recurso"
+}
+```
+Código HTTP: **401 Unauthorized**
+
+**Usuario regular (sin admin) intenta DELETE:**
+```json
+{
+    "error": "Acceso denegado",
+    "message": "No tienes permisos para realizar esta acción",
+    "required_role": "admin",
+    "current_role": "user"
+}
+```
+Código HTTP: **403 Forbidden**
+
+**Usuario admin hace DELETE exitoso:**
+```json
+{
+    "success": true,
+    "message": "Alumno eliminado correctamente (soft delete)"
+}
+```
+Código HTTP: **200 OK**
+
+### Endpoints Protegidos
+
+| Ruta | Método | Rol Requerido | Error si falla |
+|------|--------|---------------|----------------|
+| `/api/alumnos` | POST | admin | 403 Forbidden |
+| `/api/alumnos` | PATCH | admin | 403 Forbidden |
+| `/api/alumnos` | DELETE | admin | 403 Forbidden |
+| `/api/alumnos/deleted` | GET | admin | 403 Forbidden |
+| `/api/alumnos/restore` | POST | admin | 403 Forbidden |
+| `/api/alumnos/force-delete` | DELETE | admin | 403 Forbidden |
+| `/api/alumnos` | GET | Cualquiera autenticado | 401 Unauthorized |
+
+---
+
+## Endpoint /stats - Métricas del Servidor
+
+### Respuesta del Endpoint
+
+```json
+GET /api/stats
+
+{
+    "uptime_seconds": 45.23,
+    "memory_MB": 2.5,
+    "fecha": "2024-01-15 14:35:20"
+}
+```
+
+### Implementación
+
+**StatsController.php:**
+```php
+class StatsController {
+    public static function handler() {
+        try {
+            $uptime = round(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 2);
+            $memory = round(memory_get_usage() / 1024 / 1024, 2);
+            echo json_encode([
+                "uptime_seconds" => $uptime,
+                "memory_MB" => $memory,
+                "fecha" => date("Y-m-d H:i:s")  
+            ]);
+        } catch (Exception $e) {
+            Logger::error("Error en estadísticas: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(["error" => "Error al obtener estadísticas"]);
+        }
+    }
+}
+```
+
+### En routes.php
+
+```php
+case $resource === 'stats' && $method === 'GET':
+    AuthMiddleware::handle(); // Requiere autenticación
+    StatsController::handler();
+    break;
+```
+
+### Métricas Disponibles
+
+- **uptime_seconds:** Tiempo en segundos desde que se inició la petición
+- **memory_MB:** Memoria RAM usada en MB
+- **fecha:** Timestamp del servidor en formato Y-m-d H:i:s
+
+### Cómo Usar
+
+1. Abre el dashboard
+2. Haz clic en botón "Estadísticas"
+3. Se mostrará en la consola JSON similar a:
+```
+[14:35:20] GET /api/stats:
+{
+  "uptime_seconds": 0.15,
+  "memory_MB": 2.34,
+  "fecha": "2024-01-15 14:35:20"
+}
+```
+
+---
+
+## Rate Limiting y Límite de Intentos
+
+### LoginAttemptMiddleware.php
+
+Limita a 3 intentos fallidos de login en 1 minuto:
+
+```php
+class LoginAttemptMiddleware {
+    private static $maxAttempts = 3;
+    private static $lockoutTime = 60; // segundos
+    
+    public static function checkLoginAttempts($username) {
+        try {
+            $db = new Database();
+            $conn = $db->getConnection();
+            
+            // Verificar si usuario está bloqueado
+            $stmt = $conn->prepare("SELECT * FROM login_attempts 
+                                   WHERE username = :username 
+                                   AND locked_until > NOW()");
+            $stmt->execute([':username' => $username]);
+            
+            if ($stmt->rowCount() > 0) {
+                http_response_code(429); // Too Many Requests
+                echo json_encode([
+                    "error" => "Demasiados intentos fallidos",
+                    "message" => "Tu cuenta ha sido bloqueada por 1 minuto"
+                ]);
+                return false;
+            }
+        } catch (Exception $e) {
+            Logger::error("Error en rate limiting: " . $e->getMessage());
+        }
+        
+        return true;
+    }
+    
+    public static function recordFailedAttempt($username) {
+        try {
+            $db = new Database();
+            $conn = $db->getConnection();
+            
+            $stmt = $conn->prepare("INSERT INTO login_attempts (username, attempt_count, locked_until)
+                                   VALUES (:username, 1, DATE_ADD(NOW(), INTERVAL 1 MINUTE))
+                                   ON DUPLICATE KEY UPDATE attempt_count = attempt_count + 1");
+            $stmt->execute([':username' => $username]);
+            
+            Logger::security("Intento de login fallido registrado", ["user" => $username]);
+        } catch (Exception $e) {
+            Logger::error("Error al registrar intento fallido: " . $e->getMessage());
+        }
+    }
+    
+    public static function clearAttempts($username) {
+        try {
+            $db = new Database();
+            $conn = $db->getConnection();
+            
+            $stmt = $conn->prepare("DELETE FROM login_attempts WHERE username = :username");
+            $stmt->execute([':username' => $username]);
+        } catch (Exception $e) {
+            Logger::error("Error al limpiar intentos: " . $e->getMessage());
+        }
+    }
+}
+```
+
+### Tabla login_attempts
+
+```sql
+CREATE TABLE login_attempts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    attempt_count INT DEFAULT 1,
+    locked_until TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Flujo de Rate Limiting
+
+1. Usuario intenta login con credenciales incorrectas
+2. Se registra en tabla `login_attempts`
+3. Si hay 3 intentos en 1 minuto, cuenta se bloquea
+4. API devuelve código **429 Too Many Requests**
+5. Después de 1 minuto, se desbloquea automáticamente
+
+### Mensajes al Usuario
+
+**Intento 1 o 2 fallidos:**
+```json
+{
+    "error": "Credenciales inválidas",
+    "message": "Intento 2 de 3"
+}
+```
+
+**Bloqueado después de 3 intentos:**
+```json
+{
+    "error": "Demasiados intentos fallidos",
+    "message": "Tu cuenta ha sido bloqueada por 1 minuto",
+    "code": 429
+}
+```
+
+---
+
+## Logs de Actividad y Errores
+
+### Sistema de Logging
+
+El logger implementado en `config/logger.php` incluye:
+
+**Niveles de Log:**
+- DEBUG - Información detallada para desarrollo
+- INFO - Eventos normales del sistema
+- WARN - Advertencias y situaciones inusuales
+- ERROR - Errores recuperables
+- FATAL - Errores críticos
+
+**Características:**
+- Rotación automática de logs (comprime a gzip cada 5000 líneas)
+- Archivo principal: `logs/server.log`
+- Archivos archivados: `logs/archive/`
+- Información completa: timestamp, IP, método HTTP, contexto# APISelene - API REST
 
 ## Objetivo General
 
@@ -407,6 +804,21 @@ Respuesta:
 
 ---
 
+## Video de Funcionamiento
+
+### Demostración Completa de la API
+
+![Video README](./VideoReadme.mp4)
+
+El video demuestra:
+- Autenticación exitosa
+- Control de roles funcionando
+- CRUD completo (Create - Read - Update - Delete)
+- Soft delete en acción
+- Logs registrando cada operación
+
+---
+
 ## Capturas del Funcionamiento
 
 ### 1. Base de Datos - Tabla alumnos
@@ -563,18 +975,50 @@ El proyecto muestra que se pueden implementar características de nivel profesio
 
 ---
 
-## Requisitos del Proyecto Cumplidos
+## Requisitos del Proyecto
 
 | Requisito | Estado |
 |-----------|--------|
-| API REST modular | Completado |
-| CRUD + Soft Delete | Completado |
-| Autenticación y sesiones | Completado |
-| Protección del API | Completado |
-| Validación y sanitización | Completado |
-| Logs de actividad | Completado |
-| Separación de roles | Completado |
-| Documentación completa | Completado |
+| Try/Catch implementado en controladores | Completado |
+| Monitoreo de peticiones (server.log) | Completado |
+| Control de roles con 403 Forbidden | Completado |
+| Endpoint /stats con métricas | Completado |
+| Documentación README ampliada | Completado |
+| Video funcionamiento API | Completado |
+| Rate limiting intentos login | Completado |
+| Código comentado | Completado |
+
+---
+
+## Archivos Clave del Proyecto
+
+### Backend (API)
+- `api/config/db.php` - Conexión PDO con try/catch
+- `api/config/logger.php` - Sistema de logging con rotación
+- `api/controllers/AuthController.php` - Autenticación con excepciones
+- `api/controllers/AlumnosController.php` - CRUD con manejo de errores
+- `api/controllers/StatsController.php` - Métricas del servidor
+- `api/middleware/AuthMiddleware.php` - Verificación de sesiones
+- `api/middleware/RoleMiddleware.php` - Control de roles (403 Forbidden)
+- `api/middleware/LoginAttemptMiddleware.php` - Rate limiting
+- `api/models/Alumnos.php` - Modelo con soft delete y try/catch
+- `api/models/User.php` - Modelo de usuarios
+- `api/routes.php` - Enrutamiento protegido
+- `api/utils/Validator.php` - Validación de datos
+- `api/utils/Sanitizer.php` - Sanitización de entradas
+- `api/traits/SoftDelete.php` - Trait reutilizable
+
+### Frontend
+- `login.html` - Interfaz de login
+- `dashboard.html` - Dashboard con control de roles
+
+### Logging
+- `logs/server.log` - Archivo de logs
+- `logs/archive/` - Logs comprimidos
+
+### Multimedia
+- `screenshots/` - Capturas de pantalla
+- `VideoReadme.mp4` - Video de demostración
 
 ---
 
@@ -585,3 +1029,53 @@ El proyecto muestra que se pueden implementar características de nivel profesio
 **Credenciales de Prueba:**
 - Admin: admin / password
 - Usuario: selene / password
+
+---
+
+## Estructura de Carpetas Completa
+
+```
+APISelene/
+├── api/
+│   ├── config/
+│   │   ├── db.php
+│   │   └── logger.php
+│   ├── controllers/
+│   │   ├── AuthController.php
+│   │   ├── AlumnosController.php
+│   │   └── StatsController.php
+│   ├── middleware/
+│   │   ├── AuthMiddleware.php
+│   │   ├── RoleMiddleware.php
+│   │   └── LoginAttemptMiddleware.php
+│   ├── models/
+│   │   ├── Alumnos.php
+│   │   └── User.php
+│   ├── utils/
+│   │   ├── Validator.php
+│   │   └── Sanitizer.php
+│   ├── traits/
+│   │   └── SoftDelete.php
+│   ├── logs/
+│   │   ├── server.log
+│   │   └── archive/
+│   ├── screenshots/
+│   └── routes.php
+├── login.html
+├── dashboard.html
+├── VideoReadme.mp4
+├── README.md
+└── .htaccess
+```
+
+---
+
+## Tecnologías Utilizadas
+
+- **Backend:** PHP 7.4+
+- **Base de Datos:** MySQL 5.7+
+- **Server:** Apache (XAMPP)
+- **Frontend:** HTML, CSS (Tailwind), JavaScript
+- **Patrones:** MVC, Middleware, Traits
+- **Seguridad:** PDO, Prepared Statements, Sessions, RBAC
+- **Logging:** Archivo con rotación automática
