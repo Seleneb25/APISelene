@@ -810,6 +810,10 @@ Respuesta:
 
 ![Video README](./VideoReadme.mp4)
 
+
+https://github.com/user-attachments/assets/1d226c8c-1bd7-4c19-ad65-6a50740e90e2
+
+
 El video demuestra:
 - Autenticación exitosa
 - Control de roles funcionando
