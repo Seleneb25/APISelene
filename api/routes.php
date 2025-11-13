@@ -1,3 +1,4 @@
+<?php
 // api/routes.php (ACTUALIZADO PARA ALUMNOS)
 
 // TODOS los archivos están dentro de api/

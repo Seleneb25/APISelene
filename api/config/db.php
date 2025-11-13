@@ -1,7 +1,6 @@
 <?php
 // config/db.php
 require_once __DIR__ . '/logger.php';
-
 class Database {
     private $host = "localhost";
     private $db_name = "rest_api_selene"; 
@@ -36,7 +35,6 @@ class Database {
             ]);
             exit;
         }
-
         return $this->conn;
     }
 }

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../config/db.php'; // NUEVO: Incluir Database
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../models/Alumnos.php';
 require_once __DIR__ . '/../models/User.php';
@@ -15,11 +16,21 @@ class StatsController
             
             // Métricas de la aplicación
             $alumnosModel = new Alumnos();
-            $userModel = new User((new Database())->getConnection());
+            
+            // CORREGIDO: Crear conexión para User
+            $database = new Database();
+            $db = $database->getConnection();
+            $userModel = new User($db);
             
             $total_alumnos = $alumnosModel->getAllActive() ? count($alumnosModel->getAllActive()) : 0;
             $alumnos_eliminados = $alumnosModel->getDeleted() ? count($alumnosModel->getDeleted()) : 0;
-            $total_usuarios = $userModel->getAllUsers() ? count($userModel->getAllUsers()) : 0;
+            
+            // CORREGIDO: Verificar si el método existe
+            $total_usuarios = 0;
+            if (method_exists($userModel, 'getAllUsers')) {
+                $usuarios = $userModel->getAllUsers();
+                $total_usuarios = $usuarios ? count($usuarios) : 0;
+            }
             
             // Métricas del sistema
             $load = function_exists('sys_getloadavg') ? sys_getloadavg() : [0, 0, 0];
@@ -43,7 +54,7 @@ class StatsController
                     "php_version" => $php_version
                 ],
                 
-                //  MÉTRICAS DE LA APLICACIÓN
+                // MÉTRICAS DE LA APLICACIÓN
                 "aplicacion" => [
                     "total_alumnos" => $total_alumnos,
                     "alumnos_eliminados" => $alumnos_eliminados,

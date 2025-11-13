@@ -77,14 +77,14 @@ class RateLimitDB {
         // Verificar si excede el límite
         if ($newAttempts >= $maxAttempts) {
             // Bloquear IP
-            $blockUntil = date('Y-m-d H:i:s', time() + ($blockMinutes * 60));
+             $blockUntil = date('Y-m-d H:i:s', time() + (1 * 60)); // 1 minuto
             $stmt = $this->db->prepare("UPDATE {$this->table} SET blocked_until = ? WHERE ip = ?");
             $stmt->execute([$blockUntil, $ip]);
             
             http_response_code(429);
             echo json_encode([
                 "error" => "Demasiados intentos",
-                "message" => "IP bloqueada por 5 minutos. Límite: 3 intentos en 1 minuto."
+                "message" => "IP bloqueada por 1 minutos. Límite: 3 intentos en 1 minuto."
             ]);
             return false;
         }

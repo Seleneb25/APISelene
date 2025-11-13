@@ -10,7 +10,7 @@ class LoginAttemptMiddleware {
         if (!self::$rateLimit) {
             self::$rateLimit = new RateLimitDB();
         }
-        return self::$rateLimit->checkRateLimit(3, 1, 5); // 3 intentos en 1 min, bloqueo 5 min
+         return self::$rateLimit->checkRateLimit(3, 1, 1); // CAMBIAR:  1 minuto
     }
     
     public static function recordLoginAttempt($username, $success) {
